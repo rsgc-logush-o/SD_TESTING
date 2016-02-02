@@ -17,44 +17,110 @@
 #define CMD32 B01100000
 #define CMD33 B01100001
 #define CMD38 B01100110
+#define CMD41 B01101001
 #define CMD42 B01101010
 #define CMD55 B01110111
 #define CMD56 B01111000
 #define CMD58 B01111010
 #define CMD59 B01111011
 
+#define R1 8
+#define R2 16
+#define R3 40
+
 int clockPin = 9;
 int dataOut = 10;
 int dataIn = 11;
+int cardSelect = 8;
+int cardIn = 4;
+int cardOut = 5;
+int statusLedRed = 6;
+int statusLedGreen = 7;
 
-void setup() {
-  // put your setup code here, to run once:
-
+void setup() 
+{
+  Serial.begin(9600);
+  pinMode(clockPin, OUTPUT);
+  pinMode(dataOut, OUTPUT);
+  pinMode(dataIn, INPUT);
+  pinMode(cardSelect, OUTPUT);
+  pinMode(cardIn, INPUT);
+  pinMode(cardOut, INPUT);
+  pinMode(statusLedRed, OUTPUT);
+  pinMode(statusLedGreen, OUTPUT);
 }
 
-void loop() {
-  // put your main code here, to run repeatedly:
-
+void loop() 
+{
+  if(digitalRead(cardIn))initSD();
 }
 
 void initSD()
 {
 
+  boolean isInit = false;
+  
+  digitalWrite(cardSelect, HIGH);
+  digitalWrite(dataOut, HIGH);
+  
+  for(int i = 0; i < 74; i++)
+  {
+    digitalWrite(clockPin, LOW);
+    digitalWrite(clockPin, HIGH);
+  }
+
+  digitalWrite(cardSelect, LOW);
+
+  sendCommand(CMD0, 0);
+
+  recieveData(R1);
+
+  while(!isInit)
+  {
+    sendCommand(CMD55, 0);
+
+    recieveData(R1);
+
+    sendCommand(CMD41, 0);
+
+    if(recieveData == 0)isInit = true;
+  }
+
+  sendCommand(CMD58, 0);
+
+  recieveData(R3);
+
+ 
+
 }
 
-void sendCommand(uint64_t commandToSend)
+void sendCommand(uint8_t command, uint32_t arguments)
 {
+
+  uint64_t fullCommand = command << 40 | arguments << 8 | 1;
+  
   for(uint8_t i = 47; i > -1; i--)
   {
     digitalWrite(clockPin, LOW);
 
-    digitalWrite(dataOut, commandToSend >> & 1);
+    digitalWrite(dataOut, fullCommand >> i & 1);
 
     digitalWrite(clockPin, HIGH);
   }
 }
 
-void recieveData()
+uint64_t recieveData(uint8_t responseSize)
 {
-  
+
+  uint64_t dataRecieved = 0;
+  for(uint8_t i = 0; i < responseSize; i++)
+  {
+    digitalWrite(clockPin, HIGH);
+    
+    dataRecieved |= digitalRead(dataIn) << responseSize - i;
+
+    digitalWrite(clockPin, LOW);
+  }
+
+  return dataRecieved;
 }
